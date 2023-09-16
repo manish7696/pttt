@@ -1,91 +1,83 @@
 import socket
 import pyaudio
 import threading
-import os
-import time
 from kivy.lang import Builder
 from kivymd.app import MDApp
 from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivy.core.window import Window
+from kivy.clock import Clock
 
+# Your configuration variables go here (same as in the original code)
 SENDER_HOST = '0.0.0.0'
 SENDER_PORT = 12345
-RECEIVER_IP = '192.168.17.219'
+RECEIVER_IP = '192.168.29.183'
 RECEIVER_PORT = 12346
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
-CHUNK = 4096
+CHUNK = 1024
 MAX_PACKET_SIZE = 4096
-server_ip = '192.168.17.219'
+server_ip = '192.168.29.183'
 server_port = 12356
 
+# Initialize PyAudio and create streams (same as in the original code)
 audio = pyaudio.PyAudio()
 sender_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 receiver_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
 
-
+# Set up sockets (same as in the original code)
 sender_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 receiver_socket.bind((SENDER_HOST, RECEIVER_PORT))
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+ptt_active = False
 
-def receive_audio():
+def send_audio(ev):
+    while True:
+        if ptt_active:
+            data = sender_stream.read(CHUNK)
+            for i in range(0, len(data), MAX_PACKET_SIZE):
+                chunk = data[i:i+MAX_PACKET_SIZE]
+                sender_socket.sendto(chunk, (RECEIVER_IP, RECEIVER_PORT))
+
+def receive_audio(ev):
     while True:
         data, _ = receiver_socket.recvfrom(MAX_PACKET_SIZE)
         receiver_stream.write(data)
-        if ptt_active: break
 
-ptt_active = False
-send_audio_thread = None  # Store the send audio thread
+# Start sender and receiver threads (same as in the original code)
+sender_thread = threading.Thread(target=send_audio)
+receiver_thread = threading.Thread(target=receive_audio)
+sender_thread.start()
+receiver_thread.start()
+
+KV = '''
+BoxLayout:
+    orientation: 'vertical'
+
+    MDRaisedButton:
+        text: "PTT"
+        on_press: app.ptt_pressed()
+        on_release: app.ptt_released()
+'''
 
 class PTTApp(MDApp):
-    
     def build(self):
-        Window.size = (320, 640)
-        layout = MDBoxLayout(orientation='horizontal', spacing=10)
-        pttbutton = MDRaisedButton(text='PTT', on_press=self.ptt_pressed, on_release=self.ptt_released)
-        quitbutton = MDRaisedButton(text='QUIT', on_press=self.quit_app)
+        return Builder.load_string(KV)
 
-        layout.add_widget(pttbutton)
-        layout.add_widget(quitbutton)
-
-        return layout
-
-    def ptt_pressed(self, ev):
+    def ptt_pressed(self):
         global ptt_active
         ptt_active = True
         print("Talking...")
-        self.start_send_audio()  # Start the send audio thread
+        client_socket.sendto(b'high', (server_ip, server_port))
+        Clock.schedule_interval(send_audio, 1.0 / RATE)
 
-    def ptt_released(self, ev):
+    def ptt_released(self):
         global ptt_active
         ptt_active = False
-        receive_audio()
-        print("ptt false\nNot talking...")
-
-    def send_audio_loop(self):
-        while ptt_active:
-            try:
-                print('sending')
-                data = sender_stream.read(CHUNK)
-                for i in range(0, len(data), MAX_PACKET_SIZE):
-                    chunk = data[i:i + MAX_PACKET_SIZE]
-                    sender_socket.sendto(chunk, (RECEIVER_IP, RECEIVER_PORT))
-                time.sleep(0.01)  # Add a small delay to control sending rate
-            except:
-                print('audio processed too fast')
-
-    def start_send_audio(self):
-        global send_audio_thread
-        if send_audio_thread is None or not send_audio_thread.is_alive():
-            send_audio_thread = threading.Thread(target=self.send_audio_loop, daemon=True)
-            send_audio_thread.start()
-
-    def quit_app(self, ev):
-        os._exit(0)
+        print("Not talking...")
+        client_socket.sendto(b'low', (server_ip, server_port))
+        Clock.unschedule(send_audio)
 
 if __name__ == '__main__':
     PTTApp().run()
