@@ -36,7 +36,7 @@ def receive_audio():
     while True:
         data, _ = receiver_socket.recvfrom(MAX_PACKET_SIZE)
         receiver_stream.write(data)
-        if not ptt_active: break
+        if ptt_active: break
 
 ptt_active = False
 send_audio_thread = None  # Store the send audio thread
