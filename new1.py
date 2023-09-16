@@ -25,10 +25,17 @@ audio = pyaudio.PyAudio()
 sender_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 receiver_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
 
+
 sender_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 receiver_socket.bind((SENDER_HOST, RECEIVER_PORT))
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
+def receive_audio():
+    while True:
+        data, _ = receiver_socket.recvfrom(MAX_PACKET_SIZE)
+        receiver_stream.write(data)
 
 ptt_active = False
 send_audio_thread = None  # Store the send audio thread
@@ -55,6 +62,7 @@ class PTTApp(MDApp):
     def ptt_released(self, ev):
         global ptt_active
         ptt_active = False
+        receive_audio()
         print("ptt false\nNot talking...")
 
     def send_audio_loop(self):
