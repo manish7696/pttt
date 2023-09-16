@@ -9,14 +9,14 @@ from kivy.clock import Clock
 # Your configuration variables go here (same as in the original code)
 SENDER_HOST = '0.0.0.0'
 SENDER_PORT = 12345
-RECEIVER_IP = '192.168.29.183'
+RECEIVER_IP = '192.168.17.255'
 RECEIVER_PORT = 12346
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
 CHUNK = 1024
 MAX_PACKET_SIZE = 4096
-server_ip = '192.168.29.183'
+server_ip = '192.168.17.255'
 server_port = 12356
 
 # Initialize PyAudio and create streams (same as in the original code)
