@@ -1,0 +1,77 @@
+import socket
+import pyaudio
+import threading
+from kivy.lang import Builder
+from kivymd.app import MDApp
+from kivymd.uix.button import MDRaisedButton
+
+KV = '''
+BoxLayout:
+    orientation: 'vertical'
+
+    MDRaisedButton:
+        text: "Push to Talk"
+        on_press: app.start_audio_stream()
+        on_release: app.stop_audio_stream()
+'''
+
+class AudioStreamerApp(MDApp):
+    SENDER_HOST = '0.0.0.0'
+    SENDER_PORT = 12345
+    RECEIVER_IP = '192.168.29.183'
+    RECEIVER_PORT = 12346
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 1
+    RATE = 44100
+    CHUNK = 1024
+    MAX_PACKET_SIZE = 4096
+    server_ip = '192.168.29.183'
+    server_port = 12356
+
+    def build(self):
+        self.root = Builder.load_string(KV)
+        return self.root
+
+    def on_start(self):
+        self.audio = pyaudio.PyAudio()
+        self.sender_stream = self.audio.open(format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE, input=True,
+                                             frames_per_buffer=self.CHUNK)
+        self.receiver_stream = self.audio.open(format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE,
+                                               output=True, frames_per_buffer=self.CHUNK)
+        self.sender_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.receiver_socket.bind((self.SENDER_HOST, self.RECEIVER_PORT))
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.ptt_active = False
+
+    def send_audio(self):
+        while True:
+            if self.ptt_active:
+                data = self.sender_stream.read(self.CHUNK)
+                for i in range(0, len(data), self.MAX_PACKET_SIZE):
+                    chunk = data[i:i + self.MAX_PACKET_SIZE]
+                    self.sender_socket.sendto(chunk, (self.RECEIVER_IP, self.RECEIVER_PORT))
+
+    def receive_audio(self):
+        while True:
+            data, _ = self.receiver_socket.recvfrom(self.MAX_PACKET_SIZE)
+            self.receiver_stream.write(data)
+
+    def start_audio_stream(self):
+        if not self.ptt_active:
+            self.client_socket.sendto(b'high', (self.server_ip, self.server_port))
+            self.ptt_active = True
+            print("Talking...")
+            self.sender_thread = threading.Thread(target=self.send_audio)
+            self.receiver_thread = threading.Thread(target=self.receive_audio)
+            self.sender_thread.start()
+            self.receiver_thread.start()
+
+    def stop_audio_stream(self):
+        if self.ptt_active:
+            self.client_socket.sendto(b'low', (self.server_ip, self.server_port))
+            self.ptt_active = False
+            print("Not talking...")
+
+if __name__ == '__main__':
+    AudioStreamerApp().run()
