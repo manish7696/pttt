@@ -3,7 +3,7 @@ from pydub import AudioSegment
 from pydub.playback import play
 import pyaudio 
 import threading
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 
 server_ip = '0.0.0.0'
 server_port = 6000
@@ -24,12 +24,12 @@ print(f"Server listening on {server_ip}:{server_port}")
 
 client_address = None
 
-
+'''
 #gpio pin setup
 GPIO.setmode(GPIO.BCM)
 gpio_pin = 17
 GPIO.setup(gpio_pin, GPIO.OUT)
-
+'''
 
 def recieve_audio():
     while True:
@@ -48,10 +48,10 @@ def recieve_audio():
             
                 if data == b"high":
                     print("relay on")
-                    GPIO.output(gpio_pin, GPIO.LOW)
+                    #GPIO.output(gpio_pin, GPIO.LOW)
                 if data == b"low":
                     print("relay off")  
-                    GPIO.output(gpio_pin, GPIO.HIGH)
+                    #GPIO.output(gpio_pin, GPIO.HIGH)
 
                 if not data:
                     break
