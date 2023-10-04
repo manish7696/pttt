@@ -15,6 +15,7 @@ reciever_stream = audio.open(format=FORMAT, rate=RATE, output=True, channels=CHA
 # sender_stream = audio.open(format=FORMAT, rate=RATE, input=True, channels=CHANNELS, frames_per_buffer=CHUNK)
 
 clients = {}
+lock = threading.Lock()
 
 def handle_client(client_socket, client_address):
     client_identifier = f"{client_address[0]}:{client_address[1]}"
@@ -23,12 +24,27 @@ def handle_client(client_socket, client_address):
 
     try:
         while True:
-            # Receive and process data from the client here
             data = client_socket.recv(1024)
-            print(data)
-            # if not data:
-            #     break
-            # # Process data as needed
+            if not data:
+                break
+            
+            data_length = len(data.strip())
+
+            if data_length == 4:
+                # Acquire the lock when data with length 4 is received
+                lock.acquire()
+                try:
+                    # Process data with length 4
+                    print(f"Received data with length 4 from {client_identifier}: {data.decode('utf-8')}")
+                    # Process the data as needed
+                finally:
+                    # Release the lock after processing
+                    lock.release()
+            elif data_length == 3:
+                # Process data with length 3
+                print(f"Received data with length 3 from {client_identifier}: {data.decode('utf-8')}")
+                # Process the data as needed
+
             
     except Exception as e:
         print(f"Error with client {client_identifier}: {e}")
@@ -54,3 +70,6 @@ def connections():
         client_handler_thread = threading.Thread(target=handle_client, args=(client_socket, client_address))
         client_handler_thread.start()
 
+if __name__ == "__main__":
+    connection_thread = threading.Thread(target=connections)
+    connection_thread.start()
